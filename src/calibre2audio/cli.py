@@ -1,4 +1,4 @@
-"""Command-line interface for kindle2audio."""
+"""Command-line interface for calibre2audio."""
 
 from __future__ import annotations
 

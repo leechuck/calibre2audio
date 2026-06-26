@@ -14,7 +14,7 @@ import numpy as np
 SAMPLE_RATE = 24000
 
 # Curated, known-good English voices. Any other Kokoro voice id also works if
-# passed explicitly; this list just drives `kindle2audio voices` and validation.
+# passed explicitly; this list just drives `calibre2audio voices` and validation.
 VOICES: dict[str, str] = {
     "af_heart": "American English, female (warm) — default",
     "af_bella": "American English, female",

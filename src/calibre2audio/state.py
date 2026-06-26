@@ -19,11 +19,11 @@ from pathlib import Path
 
 
 def data_dir() -> Path:
-    """Return the kindle2audio data directory, creating it if needed."""
+    """Return the calibre2audio data directory, creating it if needed."""
     base = os.environ.get("XDG_DATA_HOME") or os.path.join(
         os.path.expanduser("~"), ".local", "share"
     )
-    d = Path(base) / "kindle2audio"
+    d = Path(base) / "calibre2audio"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

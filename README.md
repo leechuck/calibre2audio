@@ -1,4 +1,4 @@
-# kindle2audio
+# calibre2audio
 
 Turn a stretch of a book in your [Calibre](https://calibre-ebook.com/) library
 into a single MP3 sized to your run, starting from wherever you currently are on
@@ -80,8 +80,8 @@ generation. If you have no NVIDIA GPU and want a smaller install, see
 ## Install
 
 ```sh
-git clone https://github.com/leechuck/kindle2audio.git
-cd kindle2audio
+git clone https://github.com/leechuck/calibre2audio.git
+cd calibre2audio
 uv sync          # or: just sync
 ```
 
@@ -92,19 +92,19 @@ MB) once.
 
 ```sh
 # Find a book's id / confirm the title
-uv run kindle2audio books "hail mary"
+uv run calibre2audio books "hail mary"
 
 # Generate ~90 minutes starting from a phrase you just read on the Kindle
-uv run kindle2audio generate \
+uv run calibre2audio generate \
   --book "Project Hail Mary" \
   --from "the airlock cycled with a hiss" \
   --minutes 90
 
 # Next run: continue from where that export ended
-uv run kindle2audio generate --book "Project Hail Mary" --resume -m 60
+uv run calibre2audio generate --book "Project Hail Mary" --resume -m 60
 
 # See where you'll resume from
-uv run kindle2audio status --book "Project Hail Mary"
+uv run calibre2audio status --book "Project Hail Mary"
 ```
 
 Output lands in `~/audiobooks/` by default (`--out` to change). Files are tagged
@@ -119,7 +119,7 @@ with title/author/album so they group nicely in a player.
 | `voices` | List the curated Kokoro voices. |
 | `status` | Show the saved resume position for a book. |
 
-Run `uv run kindle2audio --help` or `... <command> --help` for full details.
+Run `uv run calibre2audio --help` or `... <command> --help` for full details.
 
 ## Options for `generate`
 
@@ -163,7 +163,7 @@ regardless of how the duration estimate landed.
 ## Voices
 
 ```sh
-uv run kindle2audio voices
+uv run calibre2audio voices
 ```
 
 Defaults to `af_heart` (warm American English female). The list includes several
@@ -176,8 +176,8 @@ English, `b` = British English).
 Resume positions and words-per-minute calibration are stored under:
 
 ```
-~/.local/share/kindle2audio/state.json      # per-book resume + calibration
-~/.local/share/kindle2audio/textcache/      # cached extracted text
+~/.local/share/calibre2audio/state.json      # per-book resume + calibration
+~/.local/share/calibre2audio/textcache/      # cached extracted text
 ```
 
 (Respects `XDG_DATA_HOME` if set.) Deleting these is harmless; you only lose
@@ -186,7 +186,7 @@ saved resume points and calibration.
 ## Project layout
 
 ```
-src/kindle2audio/
+src/calibre2audio/
   cli.py          Typer CLI: generate / books / voices / status
   library.py      Calibre lookup + text extraction (ebook-convert), cached
   textwindow.py   Phrase search (tolerant + fuzzy) and run-length windowing
@@ -199,7 +199,7 @@ src/kindle2audio/
 A quick check of the text pipeline (no GPU/TTS needed):
 
 ```sh
-just selftest        # or: uv run python -m kindle2audio._selftest
+just selftest        # or: uv run python -m calibre2audio._selftest
 ```
 
 ## Troubleshooting
