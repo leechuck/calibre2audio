@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+*.egg-info/
+
+# Local agent/scheduler artifacts
+.claude/
+
+# Generated audio / scratch
+*.mp3
+*.wav
+*.m4b
+
+# Note: uv.lock IS committed for reproducible installs.
