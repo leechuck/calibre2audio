@@ -19,3 +19,15 @@ voices:
 # Quick smoke test of the text pipeline without invoking TTS
 selftest:
     uv run python -m calibre2audio._selftest
+
+# Install the CLI as a 'calibre2audio' command on PATH (needed by the plugin)
+install-cli:
+    uv tool install . --force
+
+# Build the Calibre plugin zip into dist/
+build-plugin:
+    uv run python build_plugin.py
+
+# Build and install the plugin into your local Calibre, then it's ready to use
+install-plugin: build-plugin
+    calibre-customize -a dist/calibre2audio-plugin.zip

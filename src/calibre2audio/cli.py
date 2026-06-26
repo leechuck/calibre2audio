@@ -123,12 +123,29 @@ def generate(
         help="Override words-per-minute estimate (else self-calibrated)."),
     refresh: bool = typer.Option(
         False, "--refresh", help="Re-extract text, ignoring the cache."),
+    title: str = typer.Option(
+        None, "--title",
+        help="Override the book title used for tags/filename (e.g. from "
+             "Calibre metadata when using --file)."),
+    author: str = typer.Option(
+        None, "--author", help="Override the author used for tags."),
+    print_path: bool = typer.Option(
+        False, "--print-path",
+        help="On success, print 'OUTPUT_PATH\\t<file>' as the last line "
+             "(for scripting / the Calibre plugin)."),
 ):
     """Generate a single MP3 sized to your intended run length."""
     try:
         bk = library.resolve_book(book=book, book_id=book_id, file=file)
     except library.LibraryError as e:
         raise _fatal(str(e))
+
+    # Let callers override metadata (the Calibre plugin passes --file plus the
+    # library's real title/author so tags are correct).
+    if title:
+        bk.title = title
+    if author:
+        bk.authors = author
 
     console.print(f"[bold]{bk.title}[/] — {bk.authors}  [dim]({bk.fmt})[/]")
     with console.status("Extracting text…"):
@@ -226,6 +243,10 @@ def generate(
         f"  {_fmt_dur(result.duration_seconds)} of audio "
         f"({measured_wpm:.0f} wpm measured) · resume saved at "
         f"~{100*win.end/len(text):.0f}%")
+
+    if print_path:
+        # Plain, unformatted, stable last line for machine consumption.
+        print(f"OUTPUT_PATH\t{out_path.resolve()}")
 
 
 if __name__ == "__main__":

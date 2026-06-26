@@ -29,6 +29,7 @@ extraction, synthesis and encoding all happen locally.
 - [Choosing where to start](#choosing-where-to-start)
 - [Duration accuracy & self-calibration](#duration-accuracy--self-calibration)
 - [Voices](#voices)
+- [Calibre plugin (GUI)](#calibre-plugin-gui)
 - [Where state lives](#where-state-lives)
 - [Project layout](#project-layout)
 - [Troubleshooting](#troubleshooting)
@@ -171,6 +172,34 @@ American and British male/female voices; any other valid Kokoro voice id also
 works via `--voice`. The voice prefix selects the accent model (`a` = American
 English, `b` = British English).
 
+## Calibre plugin (GUI)
+
+Prefer to drive it from inside Calibre? There's a companion plugin that adds a
+**Run audio** toolbar button. Select a book, click it, fill in a phrase (or pick
+*Resume*) and a length, and it generates the MP3 in the background with a live
+progress log. Optionally it attaches the MP3 back onto the book in your library.
+
+The plugin is a thin front-end: Calibre's bundled Python can't host PyTorch, so
+the plugin shells out to the `calibre2audio` CLI (which must be installed and on
+your `PATH`). Install both like this:
+
+```sh
+just install-cli        # uv tool install . -> puts `calibre2audio` on PATH
+just install-plugin     # builds dist/calibre2audio-plugin.zip and adds it to Calibre
+# then restart Calibre
+```
+
+Or manually: `uv run python build_plugin.py` to build the zip, then in Calibre go
+to **Preferences → Plugins → Load plugin from file** and pick
+`dist/calibre2audio-plugin.zip`, then restart Calibre. If the **Run audio**
+button doesn't appear, add it via **Preferences → Toolbars & menus → The main
+toolbar**.
+
+If the CLI isn't found, set its command (or absolute path) under **Preferences →
+Plugins → Calibre2Audio → Customize plugin** — there you can also set a default
+voice, length and output folder. The plugin can't read your Kindle position
+either, so you still paste a phrase (or use *Resume*), exactly as with the CLI.
+
 ## Where state lives
 
 Resume positions and words-per-minute calibration are stored under:
@@ -194,6 +223,14 @@ src/calibre2audio/
   audio.py        Stream chunks to a tagged MP3 via ffmpeg
   state.py        Resume positions + self-calibrating words-per-minute
   _selftest.py    Dependency-free check of the text pipeline
+
+calibre-plugin/   Calibre GUI plugin (thin front-end that calls the CLI)
+  __init__.py     InterfaceActionBase metadata
+  ui.py           Toolbar action: read selected book, build & run the command
+  dialog.py       Parameter dialog (phrase / resume, minutes, voice, …)
+  jobs.py         Background subprocess worker + progress dialog
+  config.py       Plugin preferences + config widget
+build_plugin.py   Packages calibre-plugin/ into dist/calibre2audio-plugin.zip
 ```
 
 A quick check of the text pipeline (no GPU/TTS needed):
