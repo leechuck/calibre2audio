@@ -27,6 +27,7 @@ extraction, synthesis and encoding all happen locally.
 - [Commands](#commands)
 - [Options](#options-for-generate)
 - [Choosing where to start](#choosing-where-to-start)
+- [Loading the Suunto Aqua](#loading-the-suunto-aqua)
 - [Duration accuracy & self-calibration](#duration-accuracy--self-calibration)
 - [Voices](#voices)
 - [Calibre plugin (GUI)](#calibre-plugin-gui)
@@ -106,6 +107,11 @@ uv run calibre2audio generate --book "Project Hail Mary" --resume -m 60
 
 # See where you'll resume from
 uv run calibre2audio status --book "Project Hail Mary"
+
+# The run-morning one-liner: highlight a sentence on the Kindle, plug in the
+# Kindle and the Suunto Aqua, then render 1.5 h from that highlight and make it
+# the only track on the headphones
+uv run calibre2audio generate --from-highlight --hours 1.5 --to-suunto --eject
 ```
 
 Output lands in `~/audiobooks/` by default (`--out` to change). Files are tagged
@@ -119,6 +125,8 @@ with title/author/album so they group nicely in a player.
 | `books <query>` | List Calibre books matching a title/author search, with ids. |
 | `voices` | List the curated Kokoro voices. |
 | `status` | Show the saved resume position for a book. |
+| `devices` | Show the connected Kindle (with its newest highlight) and Suunto Aqua. |
+| `push <mp3>` | Make an existing MP3 the only removable track on the Suunto Aqua. |
 
 Run `uv run calibre2audio --help` or `... <command> --help` for full details.
 
@@ -130,8 +138,15 @@ Run `uv run calibre2audio --help` or `... <command> --help` for full details.
 | `--book-id` | Select by exact Calibre id (avoids ambiguity). |
 | `--file` | Use an ebook file directly, bypassing Calibre lookup. |
 | `--from, -f` | Phrase to start at (your Kindle position). |
+| `--from-highlight, -H` | Start at your newest highlight on the connected Kindle; also picks the book if none is given. |
+| `--kindle` | Kindle mount path, if auto-detection misses it. |
 | `--resume, -r` | Continue from the previous export's end instead of `--from`. |
 | `--minutes, -m` | Target audio length in minutes (default 60). |
+| `--hours, -t` | Target length in half-hour steps: 0.5, 1, 1.5, 2, 2.5 or 3. |
+| `--to-suunto, -s` | Afterwards, wipe the Suunto Aqua's music folder and copy the MP3 there. |
+| `--suunto` | Suunto mount path, if auto-detection misses it (or set `CALIBRE2AUDIO_SUUNTO`). |
+| `--yes, -y` | Don't ask before deleting files from the Suunto. |
+| `--eject` | Unmount the Suunto after copying. |
 | `--voice, -v` | Kokoro voice (default `af_heart`; see `voices`). |
 | `--speed` | Speech speed multiplier (1.0 = natural). |
 | `--device` | `auto` (default) / `cuda` / `cpu`. |
@@ -149,6 +164,30 @@ falls back to a fuzzy search, so a minor typo still lands you in the right place
 For subsequent runs of the same book, **`--resume`** is easier: it starts exactly
 where the previous export finished. Use `--from` for the first export of a book
 (or any time you skip around), `--resume` thereafter.
+
+**`--from-highlight`** saves the typing. On the Kindle, long-press a sentence
+on your current page and choose *Highlight*. The Kindle appends it to
+`documents/My Clippings.txt`, which calibre2audio reads when the Kindle is
+plugged in over USB. The newest highlight sets both the start point and, unless
+you name one, the book (matched to Calibre by title, then author). Notes and
+bookmarks are ignored. Newer Kindles connect over MTP: open the Kindle once in
+the file manager so gvfs mounts it, or pass `--kindle PATH`. Run
+`calibre2audio devices` to check what was found.
+
+## Loading the Suunto Aqua
+
+Put the headphones in their powerbank and connect it over USB-C; they mount as
+a drive with a top-level `music` folder, which is what offline mode plays.
+`--to-suunto` (or `push <mp3>` for an existing file) deletes every audio file in
+that folder and copies the new MP3 in. It shows the files and asks first unless
+you pass `--yes`, and it checks the headphones are connected *before* the long
+render starts. The volume is found by a name containing "suunto" or "aqua";
+otherwise pass `--suunto PATH` or set `CALIBRE2AUDIO_SUUNTO`.
+
+The ten songs Suunto preloads cannot be removed: they are stored outside the
+USB-visible drive and survive deleting its folders, and no custom firmware
+exists. To hear only the audiobook, create a playlist in the Suunto app that
+contains just your file and select it in offline mode.
 
 ## Duration accuracy & self-calibration
 

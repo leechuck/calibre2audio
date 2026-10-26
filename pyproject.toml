@@ -1,6 +1,6 @@
 [project]
 name = "calibre2audio"
-version = "0.1.0"
+version = "0.2.0"
 description = "Turn a stretch of a Calibre book into a single MP3 you can listen to on a run, starting from where you are on your Kindle."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"

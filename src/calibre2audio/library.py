@@ -140,6 +140,38 @@ def resolve_book(*, book: str | None, book_id: int | None,
     raise LibraryError("Specify a book with --book, --book-id, or --file.")
 
 
+def resolve_by_title(title: str, author: str = "") -> Book:
+    """Find the Calibre book a Kindle clipping's title/author refers to.
+
+    Sideloaded books carry Calibre's own title, so the full title usually hits;
+    otherwise retry without the subtitle, then narrow by author.
+    """
+    queries = [title]
+    short = re.split(r"[:(\[]", title, maxsplit=1)[0].strip()
+    if short and short != title:
+        queries.append(short)
+    for q in queries:
+        matches = find_books(q.replace('"', ""))
+        if len(matches) > 1 and author:
+            # Kindle writes "Last, First"; match on any author name token.
+            tokens = {t for t in re.findall(r"\w+", author.lower()) if len(t) > 2}
+            narrowed = [b for b in matches
+                        if tokens & set(re.findall(r"\w+", b.authors.lower()))]
+            matches = narrowed or matches
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            listing = "\n".join(
+                f"  - {b.title} — {b.authors} (id {b.key.split(':')[-1]})"
+                for b in matches)
+            raise LibraryError(
+                f"Highlight is from '{title}', which matches several books; "
+                f"add --book-id:\n{listing}")
+    raise LibraryError(
+        f"Highlight is from '{title}', which isn't in the Calibre library; "
+        f"pass --book or --file.")
+
+
 # ---------------------------------------------------------------------------
 # Text extraction
 # ---------------------------------------------------------------------------

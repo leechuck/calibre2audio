@@ -13,7 +13,7 @@ from rich.progress import (BarColumn, Progress, TaskProgressColumn, TextColumn,
 from rich.table import Table
 
 from . import audio as audio_mod
-from . import library, tts
+from . import devices, library, tts
 from .state import Store
 from .textwindow import find_phrase, select_window
 
@@ -35,6 +35,50 @@ def _fatal(msg: str) -> "typer.Exit":
 def _safe_filename(name: str) -> str:
     name = re.sub(r"[^\w\s.\-\[\]+]", "", name).strip()
     return re.sub(r"\s+", " ", name) or "audio"
+
+
+# Run lengths offered for --hours: half-hour steps up to three hours.
+HOUR_STEPS = (0.5, 1.0, 1.5, 2.0, 2.5, 3.0)
+
+
+def _confirm_wipe(root: Path, yes: bool) -> None:
+    """Show what will be deleted from the headphones and ask before going on."""
+    files = devices.audio_files(devices.music_dir(root))
+    console.print(f"Suunto Aqua at [bold]{root}[/]")
+    if not files:
+        console.print("  no audio files to remove")
+        return
+    console.print(f"  will delete {len(files)} audio file(s):")
+    for f in files[:15]:
+        console.print(f"    [dim]{f.relative_to(root)}[/]")
+    if len(files) > 15:
+        console.print(f"    [dim]… and {len(files) - 15} more[/]")
+    if not yes and not typer.confirm("Delete these and load the new MP3?"):
+        raise typer.Exit(code=1)
+
+
+def _push(mp3: Path, root: Path, eject: bool) -> None:
+    with console.status("Copying to the headphones…"):
+        try:
+            res = devices.push(mp3, root)
+        except devices.DeviceError as e:
+            raise _fatal(str(e))
+    console.print(f"[bold green]✓[/] on headphones: {res.dest} "
+                  f"(removed {len(res.removed)} file(s))")
+    if res.protected:
+        console.print(f"[yellow]{len(res.protected)} file(s) could not be "
+                      f"deleted:[/]")
+        for f, why in res.protected:
+            console.print(f"    [dim]{f.relative_to(root)}: {why}[/]")
+    console.print("[dim]The 10 preloaded songs live outside the USB drive and "
+                  "can't be removed; select a playlist with just this file in "
+                  "the Suunto app to hear only the audiobook.[/]")
+    if eject:
+        problem = devices.eject(root)
+        if problem:
+            console.print(f"[yellow]Could not unmount:[/] {problem}")
+        else:
+            console.print("Unmounted; safe to unplug.")
 
 
 def _fmt_dur(seconds: float) -> str:
@@ -97,6 +141,50 @@ def status(
     console.print(f"  last ended near: [italic]…{rec['snippet']}[/]")
 
 
+@app.command(name="devices")
+def show_devices(
+    kindle: str = typer.Option(None, "--kindle", help="Kindle mount path."),
+    suunto: str = typer.Option(None, "--suunto", help="Suunto mount path."),
+):
+    """Show the connected Kindle (with its newest highlight) and Suunto Aqua."""
+    try:
+        clips = devices.find_kindle_clippings(kindle)
+        c = devices.latest_highlight(clips)
+        console.print(f"Kindle: [bold]{clips}[/]\n  newest highlight: "
+                      f"[bold]{c.title}[/] ({c.author})\n  "
+                      f"[italic]“{c.text[:100]}”[/]")
+    except devices.DeviceError as e:
+        console.print(f"Kindle: [yellow]{e}[/]")
+    try:
+        root = devices.find_suunto(suunto)
+        folder = devices.music_dir(root)
+        files = devices.audio_files(folder)
+        console.print(f"Suunto: [bold]{root}[/] (music folder: {folder})")
+        for f in files:
+            console.print(f"  [dim]{f.relative_to(root)}[/]")
+    except devices.DeviceError as e:
+        console.print(f"Suunto: [yellow]{e}[/]")
+
+
+@app.command()
+def push(
+    mp3: Path = typer.Argument(..., exists=True, dir_okay=False,
+                               help="MP3 to load."),
+    suunto: str = typer.Option(None, "--suunto", help="Suunto mount path."),
+    yes: bool = typer.Option(False, "--yes", "-y",
+                             help="Don't ask before deleting."),
+    eject: bool = typer.Option(False, "--eject",
+                               help="Unmount the headphones afterwards."),
+):
+    """Make MP3 the only removable track on the Suunto Aqua."""
+    try:
+        root = devices.find_suunto(suunto)
+    except devices.DeviceError as e:
+        raise _fatal(str(e))
+    _confirm_wipe(root, yes)
+    _push(mp3, root, eject)
+
+
 @app.command()
 def generate(
     book: str = typer.Option(None, "--book", "-b", help="Title/author search."),
@@ -106,11 +194,31 @@ def generate(
         None, "--from", "-f",
         help="A distinctive phrase you just read on the Kindle; narration "
              "starts here."),
+    from_highlight: bool = typer.Option(
+        False, "--from-highlight", "-H",
+        help="Start at your newest highlight on the connected Kindle. Also "
+             "picks the book from it if no --book/--book-id/--file is given."),
+    kindle: str = typer.Option(
+        None, "--kindle", help="Kindle mount path (default: auto-detect)."),
     resume: bool = typer.Option(
         False, "--resume", "-r",
         help="Start where the previous export for this book ended."),
     minutes: float = typer.Option(
         60.0, "--minutes", "-m", help="Target length of audio, in minutes."),
+    hours: float = typer.Option(
+        None, "--hours", "-t",
+        help="Target length in hours: 0.5, 1, 1.5, 2, 2.5 or 3 "
+             "(overrides --minutes)."),
+    to_suunto: bool = typer.Option(
+        False, "--to-suunto", "-s",
+        help="Afterwards, make the MP3 the only removable track on the "
+             "connected Suunto Aqua."),
+    suunto: str = typer.Option(
+        None, "--suunto", help="Suunto mount path (default: auto-detect)."),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Don't ask before deleting from the Suunto."),
+    eject: bool = typer.Option(
+        False, "--eject", help="Unmount the Suunto after copying."),
     voice: str = typer.Option("af_heart", "--voice", "-v", help="Kokoro voice."),
     speed: float = typer.Option(1.0, "--speed", help="Speech speed multiplier."),
     out: Path = typer.Option(
@@ -135,9 +243,39 @@ def generate(
              "(for scripting / the Calibre plugin)."),
 ):
     """Generate a single MP3 sized to your intended run length."""
+    if hours is not None:
+        if hours not in HOUR_STEPS:
+            raise _fatal("--hours must be one of "
+                         + ", ".join(f"{h:g}" for h in HOUR_STEPS) + ".")
+        minutes = hours * 60
+    if sum(map(bool, (from_phrase, from_highlight, resume))) > 1:
+        raise _fatal("Use only one of --from, --from-highlight, --resume.")
+
+    # Check the headphones are there (and agree the wipe) before the long
+    # render, so you can walk away once it starts.
+    suunto_root = None
+    if to_suunto:
+        try:
+            suunto_root = devices.find_suunto(suunto)
+        except devices.DeviceError as e:
+            raise _fatal(str(e))
+        _confirm_wipe(suunto_root, yes)
+
+    have_selector = bool(book or book_id is not None or file)
+    clip = None
     try:
-        bk = library.resolve_book(book=book, book_id=book_id, file=file)
-    except library.LibraryError as e:
+        if from_highlight:
+            clips_path = devices.find_kindle_clippings(kindle)
+            if have_selector:
+                bk = library.resolve_book(book=book, book_id=book_id, file=file)
+                clip = devices.latest_highlight(clips_path, title or bk.title)
+            else:
+                clip = devices.latest_highlight(clips_path)
+                bk = library.resolve_by_title(clip.title, clip.author)
+            console.print(f"Newest highlight: [italic]“{clip.text[:80]}”[/]")
+        else:
+            bk = library.resolve_book(book=book, book_id=book_id, file=file)
+    except (library.LibraryError, devices.DeviceError) as e:
         raise _fatal(str(e))
 
     # Let callers override metadata (the Calibre plugin passes --file plus the
@@ -168,9 +306,11 @@ def generate(
         if start >= len(text):
             raise _fatal("Saved position is at the end of the book — nothing "
                          "left to narrate.")
-    elif from_phrase:
+    elif from_phrase or clip:
+        # A long highlight only slows the fuzzy search; its opening is enough.
+        phrase = from_phrase or " ".join(clip.text.split()[:15])
         try:
-            start = find_phrase(text, from_phrase)
+            start = find_phrase(text, phrase)
         except ValueError as e:
             raise _fatal(str(e))
     else:
@@ -243,6 +383,9 @@ def generate(
         f"  {_fmt_dur(result.duration_seconds)} of audio "
         f"({measured_wpm:.0f} wpm measured) · resume saved at "
         f"~{100*win.end/len(text):.0f}%")
+
+    if suunto_root is not None:
+        _push(out_path, suunto_root, eject)
 
     if print_path:
         # Plain, unformatted, stable last line for machine consumption.
